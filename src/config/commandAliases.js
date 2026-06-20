@@ -1,40 +1,19 @@
-/**
- * Command Aliases Configuration
- * Maps shortened command names to their full command names
- */
+import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
+import { getColor } from "../config/config.js";
 
-export const commandAliases = {
-    'bal': 'balance',
-    'money': 'balance',
-    'cash': 'balance',
+export default {
+  data: new SlashCommandBuilder()
+    .setName("intel-find")
+    .setDescription("Hello World"),
 
-    'dep': 'deposit',
-    'with': 'withdraw',
-    'work': 'work',
-    'daily': 'daily',
-    'gamble': 'gamble',
-    'bet': 'gamble',
-    'rob': 'rob',
-    'crime': 'crime',
-    'pay': 'pay',
-    'give': 'pay',
-    'send': 'pay',
+  async execute(interaction) {
+    const embed = new EmbedBuilder()
+      .setColor(getColor("primary"))
+      .setDescription("Hello World");
 
-    'ping': 'ping',
-    'help': 'help',
-    'h': 'help',
-    'info': 'help',
-
-    'ban': 'ban',
-    'kick': 'kick',
-    'mute': 'timeout',
-    'warn': 'warn',
-    'clear': 'purge',
-    'purge': 'purge',
-    'untimeout': 'untimeout',
-    'unmute': 'untimeout',
-
-    'rank': 'rank',
+    await interaction.reply({ embeds: [embed] });
+  },
+};    'rank': 'rank',
     'lvl': 'rank',
     'xp': 'rank',
     'leaderboard': 'leaderboard',
