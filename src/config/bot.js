@@ -1,111 +1,148 @@
 import { logger } from '../utils/logger.js';
 
+// =========================================================================
+// HELPERS INTERNES
+// =========================================================================
+
+/** Regex stricte pour valider un code couleur hexadécimal (#RGB ou #RRGGBB). */
+const HEX_COLOR_REGEX = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+
+/**
+ * Vérifie qu'une chaîne est bien un code couleur hexadécimal valide.
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isValidHexColor(value) {
+  return typeof value === "string" && HEX_COLOR_REGEX.test(value);
+}
+
+/**
+ * Transforme une variable d'environnement "id1,id2,id3" en tableau d'IDs propre.
+ * Filtre les entrées vides issues d'espaces ou de virgules en trop.
+ * @param {string | undefined} value
+ * @returns {string[]}
+ */
+function parseIdList(value) {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+}
+
+/**
+ * Parse une variable d'environnement booléenne ("true"/"1" => true).
+ * @param {string | undefined} value
+ * @param {boolean} fallback
+ * @returns {boolean}
+ */
+function parseBoolEnv(value, fallback) {
+  if (value === undefined) return fallback;
+  return value.toLowerCase() === "true" || value === "1";
+}
+
+/**
+ * Parse une variable d'environnement numérique avec garde-fou contre NaN.
+ * @param {string | undefined} value
+ * @param {number} fallback
+ * @returns {number}
+ */
+function parseIntEnv(value, fallback) {
+  if (value === undefined) return fallback;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+// =========================================================================
+// CONFIGURATION PRINCIPALE
+// =========================================================================
+
 export const botConfig = {
   // =========================
-  // BOT PRESENCE (what users see under the bot name)
+  // BOT PRESENCE (ce que les utilisateurs voient sous le nom du bot)
   // =========================
-  // `status` options:
-  // - "online"    = green dot
-  // - "idle"      = yellow moon
-  // - "dnd"       = red do-not-disturb
-  // - "invisible" = appears offline
   presence: {
-    // Current online state shown on Discord.
+    // "online" | "idle" | "dnd" | "invisible"
     status: "online",
 
-    // Activity lines shown under the bot name.
-    // `type` number mapping from Discord:
-    // 0 = Playing
-    // 1 = Streaming
-    // 2 = Listening
-    // 3 = Watching
-    // 4 = Custom
-    // 5 = Competing
+    // Lignes d'activité affichées sous le nom du bot.
+    // Mapping `type` Discord : 0=Playing, 1=Streaming, 2=Listening,
+    // 3=Watching, 4=Custom, 5=Competing.
     activities: [
       {
-        // Text users will see (example: "Playing /help | Titan Bot").
         name: "Intel-FIND",
-        // Activity type number (0 = Playing).
         type: 0,
       },
     ],
   },
 
   // =========================
-  // COMMAND BEHAVIOR
+  // COMPORTEMENT DES COMMANDES
   // =========================
   commands: {
-    // Bot owner user IDs (comma-separated in OWNER_IDS env var).
-    // Owners can access owner/admin-level bot commands.
-    owners: process.env.OWNER_IDS?.split(",") || [],
+    // IDs des owners du bot (variable d'env OWNER_IDS séparée par des virgules).
+    owners: parseIdList(process.env.OWNER_IDS),
 
-    // Default wait time between command uses (in seconds).
-    defaultCooldown: 3,
+    // Temps d'attente par défaut entre deux usages d'une commande (secondes).
+    defaultCooldown: parseIntEnv(process.env.DEFAULT_COOLDOWN, 3),
 
-    // If true, old commands are removed before re-registering.
-    deleteCommands: false,
+    // Si true, les anciennes commandes sont supprimées avant ré-enregistrement.
+    deleteCommands: parseBoolEnv(process.env.DELETE_COMMANDS, false),
 
-    // Optional server ID used for testing slash commands quickly.
-    testGuildId: process.env.TEST_GUILD_ID,
+    // ID de serveur optionnel pour tester les slash commands rapidement.
+    testGuildId: process.env.TEST_GUILD_ID || null,
 
-    // Command prefix for text-based commands (e.g., "!" for "!ping").
-    // Supports both slash commands and prefix commands.
+    // Préfixe pour les commandes textuelles (ex: "!" pour "!ping").
     prefix: process.env.PREFIX || "!",
   },
 
   // =========================
-  // APPLICATIONS SYSTEM
+  // SYSTÈME DE CANDIDATURES
   // =========================
   applications: {
-    // Default questions shown when someone fills out an application.
     defaultQuestions: [
       { question: "What is your name?", required: true },
       { question: "How old are you?", required: true },
       { question: "Why do you want to join?", required: true },
     ],
 
-    // Embed colors by application status.
     statusColors: {
       pending: "#FFA500",
       approved: "#00FF00",
       denied: "#FF0000",
     },
 
-    // How long users must wait before submitting another application (hours).
+    // Délai avant qu'un utilisateur puisse soumettre une nouvelle candidature (heures).
     applicationCooldown: 24,
 
-    // Auto-delete denied applications after this many days.
+    // Suppression automatique des candidatures refusées après X jours.
     deleteDeniedAfter: 7,
 
-    // Auto-delete approved applications after this many days.
+    // Suppression automatique des candidatures approuvées après X jours.
     deleteApprovedAfter: 30,
 
-    // Role IDs allowed to manage applications.
-    managerRoles: [], // Will be populated from environment or database
+    // IDs des rôles autorisés à gérer les candidatures.
+    managerRoles: parseIdList(process.env.APPLICATION_MANAGER_ROLES),
   },
 
   // =========================
-  // EMBED COLORS & BRANDING
+  // COULEURS DES EMBEDS & BRANDING
   // =========================
-  // IMPORTANT: This is the SINGLE SOURCE OF TRUTH for all bot colors
+  // IMPORTANT : c'est la SOURCE UNIQUE DE VÉRITÉ pour toutes les couleurs du bot.
   embeds: {
     colors: {
-      // Main brand colors.
       primary: "#336699",
       secondary: "#2F3136",
 
-      // Standard status colors for success/error/warning/info messages.
       success: "#57F287",
       error: "#ED4245",
       warning: "#FEE75C",
       info: "#3498DB",
 
-      // Neutral utility colors.
       light: "#FFFFFF",
       dark: "#202225",
       gray: "#99AAB5",
 
-      // Discord-style palette shortcuts.
       blurple: "#5865F2",
       green: "#57F287",
       yellow: "#FEE75C",
@@ -113,7 +150,6 @@ export const botConfig = {
       red: "#ED4245",
       black: "#000000",
 
-      // Feature-specific colors.
       giveaway: {
         active: "#57F287",
         ended: "#ED4245",
@@ -128,7 +164,6 @@ export const botConfig = {
       birthday: "#E91E63",
       moderation: "#9B59B6",
 
-      // Ticket priority color mapping.
       priority: {
         none: "#95A5A6",
         low: "#3498db",
@@ -138,15 +173,11 @@ export const botConfig = {
       },
     },
     footer: {
-      // Default footer text used in bot embeds.
       text: "Titan Bot",
-      // Footer icon URL (null = no icon).
       icon: null,
     },
-    // Default thumbnail URL for embeds (null = no thumbnail).
     thumbnail: null,
     author: {
-      // Optional default embed author block.
       name: null,
       icon: null,
       url: null,
@@ -154,252 +185,193 @@ export const botConfig = {
   },
 
   // =========================
-  // ECONOMY SETTINGS
+  // PARAMÈTRES DE L'ÉCONOMIE
   // =========================
   economy: {
     currency: {
-      // Currency display name.
       name: "coins",
-      // Plural display name.
       namePlural: "coins",
-      // Currency symbol shown in balances.
       symbol: "$",
     },
 
-    // Starting balance for new users.
     startingBalance: 0,
-
-    // Maximum bank amount before upgrades (if upgrades are used).
     baseBankCapacity: 100000,
-
-    // Daily reward amount.
     dailyAmount: 100,
 
-    // Work command random payout range.
     workMin: 10,
     workMax: 100,
 
-    // Beg command random payout range.
     begMin: 5,
     begMax: 50,
 
-    // Chance to succeed when robbing (0.4 = 40%).
+    // Chance de réussite d'un vol (0.4 = 40%).
     robSuccessRate: 0.4,
 
-    // Jail time after failed rob (milliseconds).
-    // 3600000 = 1 hour.
+    // Temps en prison après un vol échoué (millisecondes). 3600000 = 1h.
     robFailJailTime: 3600000,
   },
 
   // =========================
-  // SHOP SETTINGS
+  // PARAMÈTRES DE LA BOUTIQUE
   // =========================
-  // Add shop defaults here when needed.
   shop: {
-
+    // À compléter selon les besoins futurs.
   },
 
   // =========================
-  // TICKET SYSTEM
+  // SYSTÈME DE TICKETS
   // =========================
   tickets: {
-    // Category ID where new tickets are created (null = no forced category).
+    // ID de catégorie où les nouveaux tickets sont créés (null = pas forcé).
     defaultCategory: null,
 
-    // Role IDs allowed to manage/support tickets.
-    supportRoles: [],
+    // IDs des rôles autorisés à gérer/supporter les tickets.
+    supportRoles: parseIdList(process.env.TICKET_SUPPORT_ROLES),
 
-    // Priority options users/staff can assign.
     priorities: {
-      none: {
-        emoji: "⚪",
-        color: "#95A5A6",
-        label: "None",
-      },
-      low: {
-        emoji: "🟢",
-        color: "#2ECC71",
-        label: "Low",
-      },
-      medium: {
-        emoji: "🟡",
-        color: "#F1C40F",
-        label: "Medium",
-      },
-      high: {
-        emoji: "🔴",
-        color: "#E74C3C",
-        label: "High",
-      },
-      urgent: {
-        emoji: "🚨",
-        color: "#E91E63",
-        label: "Urgent",
-      },
+      none: { emoji: "⚪", color: "#95A5A6", label: "None" },
+      low: { emoji: "🟢", color: "#2ECC71", label: "Low" },
+      medium: { emoji: "🟡", color: "#F1C40F", label: "Medium" },
+      high: { emoji: "🔴", color: "#E74C3C", label: "High" },
+      urgent: { emoji: "🚨", color: "#E91E63", label: "Urgent" },
     },
 
-    // Default priority for new tickets.
     defaultPriority: "none",
 
-    // Category ID where closed tickets are archived.
+    // ID de catégorie où les tickets fermés sont archivés.
     archiveCategory: null,
 
-    // Channel ID where ticket logs are sent.
+    // ID du canal où les logs de tickets sont envoyés.
     logChannel: null,
   },
 
   // =========================
-  // GIVEAWAY SETTINGS
+  // PARAMÈTRES DES GIVEAWAYS
   // =========================
   giveaways: {
-    // Default giveaway duration in milliseconds.
-    // 86400000 = 24 hours.
+    // Durée par défaut d'un giveaway (millisecondes). 86400000 = 24h.
     defaultDuration: 86400000,
 
-    // Allowed winner count range.
     minimumWinners: 1,
     maximumWinners: 10,
 
-    // Allowed giveaway duration range in milliseconds.
     // 300000 = 5 minutes.
     minimumDuration: 300000,
-    // 2592000000 = 30 days.
+    // 2592000000 = 30 jours.
     maximumDuration: 2592000000,
 
-    // Role IDs allowed to host giveaways.
-    allowedRoles: [],
+    // IDs des rôles autorisés à organiser des giveaways.
+    allowedRoles: parseIdList(process.env.GIVEAWAY_ALLOWED_ROLES),
 
-    // Role IDs that bypass giveaway restrictions.
-    bypassRoles: [],
+    // IDs des rôles qui contournent les restrictions de giveaway.
+    bypassRoles: parseIdList(process.env.GIVEAWAY_BYPASS_ROLES),
   },
 
   // =========================
-  // BIRTHDAY SETTINGS
+  // PARAMÈTRES D'ANNIVERSAIRE
   // =========================
   birthday: {
-    // Role ID given to users on their birthday.
+    // ID du rôle donné aux utilisateurs le jour de leur anniversaire.
     defaultRole: null,
 
-    // Channel ID where birthday announcements are posted.
+    // ID du canal où les annonces d'anniversaire sont postées.
     announcementChannel: null,
 
-    // Timezone used to calculate birthday dates.
+    // Fuseau horaire utilisé pour calculer les dates d'anniversaire.
     timezone: "UTC",
   },
 
   // =========================
-  // VERIFICATION SETTINGS
+  // PARAMÈTRES DE VÉRIFICATION
   // =========================
   verification: {
-    // Message shown when posting the verification panel.
-    defaultMessage: "Click the button below to verify yourself and gain access to the server!",
-
-    // Text on the verification button.
+    defaultMessage:
+      "Click the button below to verify yourself and gain access to the server!",
     defaultButtonText: "Verify",
 
-    // Automatic verification behavior.
     autoVerify: {
-      // How automatic verification decides who is auto-approved:
-      // - "none"        = everyone is auto-verified immediately
-      // - "account_age" = account must be older than set days
-      // - "server_size" = auto-verify everyone only in smaller servers
+      // "none" | "account_age" | "server_size"
       defaultCriteria: "none",
 
-      // Days used when `defaultCriteria` is `account_age`.
+      // Jours utilisés quand `defaultCriteria` est "account_age".
       defaultAccountAgeDays: 7,
 
-      // Member count threshold used when `defaultCriteria` is `server_size`.
-      // Example: 1000 means auto-verify if server has fewer than 1000 members.
+      // Seuil de membres utilisé quand `defaultCriteria` est "server_size".
       serverSizeThreshold: 1000,
 
-      // Allowed safety limits for account-age requirements.
-      // 1 = minimum day, 365 = maximum days.
+      // Limites de sécurité autorisées pour les exigences d'âge de compte.
       minAccountAge: 1,
       maxAccountAge: 365,
 
-      // If true, user receives a DM after verification.
+      // Si true, l'utilisateur reçoit un DM après vérification.
       sendDMNotification: true,
 
-      // Human-readable descriptions for each criteria mode.
+      // Descriptions lisibles pour chaque mode de critère.
       criteria: {
         account_age: "Account must be older than specified days",
         server_size: "All users if server has less than 1000 members",
-        none: "All users immediately"
-      }
+        none: "All users immediately",
+      },
     },
 
-    // Minimum time between verification attempts (milliseconds).
-    // 5000 = 5 seconds.
+    // Temps minimum entre deux tentatives de vérification (ms). 5000 = 5s.
     verificationCooldown: 5000,
 
-    // Maximum failed attempts allowed inside the time window below.
+    // Nombre maximal de tentatives échouées dans la fenêtre ci-dessous.
     maxVerificationAttempts: 3,
 
-    // Time window for counting attempts (milliseconds).
-    // 60000 = 1 minute.
+    // Fenêtre de temps pour compter les tentatives (ms). 60000 = 1 min.
     attemptWindow: 60000,
 
-    // In-memory safety limits (helps avoid unbounded memory growth).
+    // Limites de sécurité en mémoire (évite une croissance mémoire illimitée).
     maxCooldownEntries: 10000,
     maxAttemptEntries: 10000,
-    // Cleanup frequency for cooldown/attempt maps (milliseconds).
-    // 300000 = 5 minutes.
+    // Fréquence de nettoyage des maps de cooldown/tentatives (ms). 300000 = 5 min.
     cooldownCleanupInterval: 300000,
-    // Maximum metadata payload size for audit entries (bytes).
+    // Taille maximale du payload de métadonnées pour les entrées d'audit (octets).
     maxAuditMetadataBytes: 4096,
-    // Maximum number of audit entries kept in memory.
+    // Nombre maximal d'entrées d'audit conservées en mémoire.
     maxInMemoryAuditEntries: 1000,
-    // If true, log every verification action.
+    // Si true, journalise chaque action de vérification.
     logAllVerifications: true,
-    // If true, preserve verification audit history.
+    // Si true, conserve l'historique d'audit de vérification.
     keepAuditTrail: true,
   },
 
   // =========================
-  // WELCOME / GOODBYE MESSAGES
+  // MESSAGES DE BIENVENUE / DÉPART
   // =========================
   welcome: {
-    // Welcome template posted when a user joins.
-    // Placeholders: {user}, {server}, {memberCount}
+    // Placeholders : {user}, {server}, {memberCount}
     defaultWelcomeMessage:
       "Welcome {user} to {server}! We now have {memberCount} members!",
-    // Goodbye template posted when a user leaves.
-    // Placeholders: {user}, {memberCount}
+    // Placeholders : {user}, {memberCount}
     defaultGoodbyeMessage:
       "{user} has left the server. We now have {memberCount} members.",
-    // Channel ID for welcome messages.
     defaultWelcomeChannel: null,
-    // Channel ID for goodbye messages.
     defaultGoodbyeChannel: null,
   },
 
   // =========================
-  // COUNTER CHANNELS
+  // CANAUX COMPTEURS
   // =========================
   counters: {
     defaults: {
-      // Default naming/description templates for counter entries.
       name: "{name} Counter",
       description: "Server {name} counter",
-      // Channel type used for counters (typically "voice").
       type: "voice",
-      // Channel name format. `{count}` is replaced automatically.
       channelName: "{name}-{count}",
     },
     permissions: {
-      // Default denied permissions for the counter channel.
       deny: ["VIEW_CHANNEL"],
-      // Default allowed permissions for the counter channel.
       allow: ["VIEW_CHANNEL", "CONNECT", "SPEAK"],
     },
     messages: {
-      // Default response messages for counter actions.
       created: "✅ Created counter **{name}**",
       deleted: "🗑️ Deleted counter **{name}**",
       updated: "🔄 Updated counter **{name}**",
     },
     types: {
-      // Built-in counter types and how each count is calculated.
       members: {
         name: "👥 Members",
         description: "Total members in the server",
@@ -421,7 +393,7 @@ export const botConfig = {
   },
 
   // =========================
-  // GENERIC BOT MESSAGES
+  // MESSAGES GÉNÉRIQUES DU BOT
   // =========================
   messages: {
     noPermission: "You do not have permission to use this command.",
@@ -436,27 +408,23 @@ export const botConfig = {
   // =========================
   // FEATURE TOGGLES
   // =========================
-  // Set any feature to `false` to disable it globally.
+  // Mettre une fonctionnalité à `false` la désactive globalement.
   features: {
-    // Core systems.
     economy: true,
     leveling: true,
     moderation: true,
     logging: true,
     welcome: true,
 
-    // Community engagement systems.
     tickets: true,
     giveaways: true,
     birthday: true,
     counter: true,
 
-    // Security and self-service systems.
     verification: true,
     reactionRoles: true,
     joinToCreate: true,
 
-    // Utility/quality-of-life modules.
     voice: true,
     search: true,
     tools: true,
@@ -466,45 +434,151 @@ export const botConfig = {
   },
 };
 
+// =========================================================================
+// VALIDATION DE LA CONFIGURATION
+// =========================================================================
+
+/**
+ * Valide une configuration de bot : variables d'environnement requises
+ * et cohérence interne (couleurs, plages numériques, etc.).
+ * @param {typeof botConfig} config
+ * @returns {{ errors: string[], warnings: string[] }}
+ */
 export function validateConfig(config) {
   const errors = [];
+  const warnings = [];
 
-  if (process.env.NODE_ENV !== 'production') {
-    logger.debug('Environment variables check:');
-    logger.debug('DISCORD_TOKEN exists:', !!process.env.DISCORD_TOKEN);
-    logger.debug('TOKEN exists:', !!process.env.TOKEN);
-    logger.debug('CLIENT_ID exists:', !!process.env.CLIENT_ID);
-    logger.debug('GUILD_ID exists:', !!process.env.GUILD_ID);
-    logger.debug('POSTGRES_HOST exists:', !!process.env.POSTGRES_HOST);
-    logger.debug('NODE_ENV:', process.env.NODE_ENV);
+  if (process.env.NODE_ENV !== "production") {
+    logger.debug("Environment variables check:", {
+      DISCORD_TOKEN: !!process.env.DISCORD_TOKEN,
+      TOKEN: !!process.env.TOKEN,
+      CLIENT_ID: !!process.env.CLIENT_ID,
+      GUILD_ID: !!process.env.GUILD_ID,
+      POSTGRES_HOST: !!process.env.POSTGRES_HOST,
+      NODE_ENV: process.env.NODE_ENV,
+    });
   }
 
+  // --- Variables d'environnement requises ---
   if (!process.env.DISCORD_TOKEN && !process.env.TOKEN) {
-    errors.push("Bot token is required (DISCORD_TOKEN or TOKEN environment variable)");
+    errors.push(
+      "Bot token is required (DISCORD_TOKEN or TOKEN environment variable)",
+    );
   }
 
   if (!process.env.CLIENT_ID) {
     errors.push("Client ID is required (CLIENT_ID environment variable)");
   }
 
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === "production") {
     if (!process.env.POSTGRES_HOST) {
-      errors.push("PostgreSQL host is required in production (POSTGRES_HOST environment variable)");
+      errors.push(
+        "PostgreSQL host is required in production (POSTGRES_HOST environment variable)",
+      );
     }
     if (!process.env.POSTGRES_USER) {
-      errors.push("PostgreSQL user is required in production (POSTGRES_USER environment variable)");
+      errors.push(
+        "PostgreSQL user is required in production (POSTGRES_USER environment variable)",
+      );
     }
     if (!process.env.POSTGRES_PASSWORD) {
-      errors.push("PostgreSQL password is required in production (POSTGRES_PASSWORD environment variable)");
+      errors.push(
+        "PostgreSQL password is required in production (POSTGRES_PASSWORD environment variable)",
+      );
     }
   }
 
-  return errors;
+  // --- Cohérence interne de la config ---
+  // Toutes les couleurs déclarées doivent être des hex valides.
+  const colorIssues = collectInvalidColors(config.embeds.colors, "embeds.colors");
+  errors.push(...colorIssues);
+
+  // Plages économiques cohérentes.
+  if (config.economy.workMin > config.economy.workMax) {
+    errors.push("economy.workMin cannot be greater than economy.workMax");
+  }
+  if (config.economy.begMin > config.economy.begMax) {
+    errors.push("economy.begMin cannot be greater than economy.begMax");
+  }
+  if (config.economy.robSuccessRate < 0 || config.economy.robSuccessRate > 1) {
+    errors.push("economy.robSuccessRate must be between 0 and 1");
+  }
+
+  // Plages de giveaways cohérentes.
+  if (config.giveaways.minimumWinners > config.giveaways.maximumWinners) {
+    errors.push(
+      "giveaways.minimumWinners cannot be greater than giveaways.maximumWinners",
+    );
+  }
+  if (config.giveaways.minimumDuration > config.giveaways.maximumDuration) {
+    errors.push(
+      "giveaways.minimumDuration cannot be greater than giveaways.maximumDuration",
+    );
+  }
+
+  // Vérification : la priorité par défaut des tickets doit exister.
+  if (!config.tickets.priorities[config.tickets.defaultPriority]) {
+    errors.push(
+      `tickets.defaultPriority "${config.tickets.defaultPriority}" does not match any entry in tickets.priorities`,
+    );
+  }
+
+  // Vérification : le critère d'auto-vérification par défaut doit exister.
+  if (
+    !config.verification.autoVerify.criteria[
+      config.verification.autoVerify.defaultCriteria
+    ]
+  ) {
+    errors.push(
+      `verification.autoVerify.defaultCriteria "${config.verification.autoVerify.defaultCriteria}" does not match any entry in verification.autoVerify.criteria`,
+    );
+  }
+  if (
+    config.verification.autoVerify.defaultAccountAgeDays <
+      config.verification.autoVerify.minAccountAge ||
+    config.verification.autoVerify.defaultAccountAgeDays >
+      config.verification.autoVerify.maxAccountAge
+  ) {
+    warnings.push(
+      "verification.autoVerify.defaultAccountAgeDays is outside the min/max account age bounds",
+    );
+  }
+
+  return { errors, warnings };
 }
 
-const configErrors = validateConfig(botConfig);
+/**
+ * Parcourt récursivement un objet de couleurs et collecte les valeurs
+ * qui ne sont pas des codes hexadécimaux valides.
+ * @param {Record<string, unknown>} colors
+ * @param {string} pathPrefix
+ * @returns {string[]}
+ */
+function collectInvalidColors(colors, pathPrefix) {
+  const issues = [];
+  for (const [key, value] of Object.entries(colors)) {
+    const path = `${pathPrefix}.${key}`;
+    if (typeof value === "string") {
+      if (!isValidHexColor(value)) {
+        issues.push(`Invalid hex color at ${path}: "${value}"`);
+      }
+    } else if (value && typeof value === "object") {
+      issues.push(...collectInvalidColors(value, path));
+    }
+  }
+  return issues;
+}
+
+// Exécute la validation au chargement du module.
+const { errors: configErrors, warnings: configWarnings } =
+  validateConfig(botConfig);
+
+if (configWarnings.length > 0) {
+  logger.warn("Bot configuration warnings:\n" + configWarnings.join("\n"));
+}
+
 if (configErrors.length > 0) {
-  logger.error("Bot configuration errors:", configErrors.join("\n"));
+  logger.error("Bot configuration errors:\n" + configErrors.join("\n"));
   if (process.env.NODE_ENV === "production") {
     process.exit(1);
   }
@@ -512,30 +586,88 @@ if (configErrors.length > 0) {
 
 export const BotConfig = botConfig;
 
+// =========================================================================
+// HELPERS DE COULEUR
+// =========================================================================
+
+/**
+ * Résout un chemin de couleur (ex: "ticket.open" ou "#FF0000") vers
+ * un entier compatible avec l'API Discord (ColorResolvable numérique).
+ *
+ * @param {string | number} path Chemin pointé dans `embeds.colors`, ou code hex direct.
+ * @param {string} [fallback] Couleur hex de repli si le chemin est introuvable.
+ * @returns {number} Couleur sous forme d'entier.
+ */
 export function getColor(path, fallback = "#99AAB5") {
-  
   if (typeof path === "number") return path;
-  if (typeof path === "string" && path.startsWith("#")) {
-    
-    return parseInt(path.replace("#", ""), 16);
+
+  if (typeof path !== "string") {
+    logger.warn(`getColor() received an unexpected type: ${typeof path}`);
+    return hexToInt(fallback);
   }
+
+  if (isValidHexColor(path)) {
+    return hexToInt(path);
+  }
+
   const result = path
     .split(".")
     .reduce(
-      (obj, key) => (obj && obj[key] !== undefined ? obj[key] : fallback),
+      (obj, key) =>
+        obj && obj[key] !== undefined ? obj[key] : undefined,
       botConfig.embeds.colors,
     );
-  
-  if (typeof result === "string" && result.startsWith("#")) {
-    return parseInt(result.replace("#", ""), 16);
+
+  if (result === undefined) {
+    logger.warn(`getColor(): no color found at path "${path}", using fallback`);
+    return hexToInt(fallback);
   }
-  return result;
+
+  if (isValidHexColor(result)) {
+    return hexToInt(result);
+  }
+
+  // Le chemin pointait vers un objet (catégorie) plutôt qu'une couleur finale.
+  logger.warn(
+    `getColor(): path "${path}" did not resolve to a color string, using fallback`,
+  );
+  return hexToInt(fallback);
 }
 
+/**
+ * Convertit un code hexadécimal "#RRGGBB" en entier.
+ * @param {string} hex
+ * @returns {number}
+ */
+function hexToInt(hex) {
+  return parseInt(hex.replace("#", ""), 16);
+}
+
+/**
+ * Aplati récursivement toutes les couleurs valides de `embeds.colors`
+ * en une simple liste de codes hex.
+ * @param {Record<string, unknown>} [colors]
+ * @returns {string[]}
+ */
+function flattenColors(colors = botConfig.embeds.colors) {
+  const flat = [];
+  for (const value of Object.values(colors)) {
+    if (typeof value === "string" && isValidHexColor(value)) {
+      flat.push(value);
+    } else if (value && typeof value === "object") {
+      flat.push(...flattenColors(value));
+    }
+  }
+  return flat;
+}
+
+/**
+ * Retourne une couleur aléatoire parmi toutes celles définies dans `embeds.colors`.
+ * @returns {string} Code hexadécimal (ex: "#5865F2").
+ */
 export function getRandomColor() {
-  const colors = Object.values(botConfig.embeds.colors).flatMap((color) =>
-    typeof color === "string" ? color : Object.values(color),
-  );
+  const colors = flattenColors();
+  if (colors.length === 0) return "#99AAB5";
   return colors[Math.floor(Math.random() * colors.length)];
 }
 
