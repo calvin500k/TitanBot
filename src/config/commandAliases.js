@@ -13,28 +13,7 @@ export default {
 
     await interaction.reply({ embeds: [embed] });
   },
-};    'rank': 'rank',
-    'lvl': 'rank',
-    'xp': 'rank',
-    'leaderboard': 'leaderboard',
-    'lb': 'leaderboard',
-    'top': 'leaderboard',
-
-    'shop': 'shop',
-    'buy': 'buy',
-    'inventory': 'inventory',
-    'inv': 'inventory',
-    'items': 'inventory',
-
-    'user': 'userinfo',
-    'avatar': 'avatar',
-    'pfp': 'avatar',
-    'icon': 'avatar',
-
-    'bd': 'birthday',
-    'bday': 'birthday',
-    'b': 'birthday',
-
+};
     'flip': 'flip',
     'coin': 'flip',
     'roll': 'roll',
